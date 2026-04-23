@@ -15,4 +15,6 @@ Chaque note contient :
 
 ## Technologies utilisées
 - Flutter (Frontend)
-- API REST (Backend si موجود)
+
+## Memmbre du groupe 
+- 24107,24110,24119,24120
