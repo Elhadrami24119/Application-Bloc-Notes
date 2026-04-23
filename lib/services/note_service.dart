@@ -1,15 +1,46 @@
 import 'package:flutter/material.dart';
 import '../models/note.dart';
 
+enum TriNotes {
+  dateRecent,
+  dateAncien,
+  titreAZ,
+  titreZA,
+}
+
 class NoteService extends ChangeNotifier {
   final List<Note> _notes = [];
+  TriNotes _triActuel = TriNotes.dateRecent;
 
-  List<Note> get notes => List.unmodifiable(_notes);
+  List<Note> get notes {
+    final liste = List<Note>.from(_notes);
+    switch (_triActuel) {
+      case TriNotes.dateRecent:
+        liste.sort((a, b) => b.dateCreation.compareTo(a.dateCreation));
+        break;
+      case TriNotes.dateAncien:
+        liste.sort((a, b) => a.dateCreation.compareTo(b.dateCreation));
+        break;
+      case TriNotes.titreAZ:
+        liste.sort((a, b) => a.titre.compareTo(b.titre));
+        break;
+      case TriNotes.titreZA:
+        liste.sort((a, b) => b.titre.compareTo(a.titre));
+        break;
+    }
+    return List.unmodifiable(liste);
+  }
 
+  TriNotes get triActuel => _triActuel;
   int get count => _notes.length;
 
+  void changerTri(TriNotes tri) {
+    _triActuel = tri;
+    notifyListeners();
+  }
+
   void addNote(Note note) {
-    _notes.insert(0, note);
+    _notes.add(note);
     notifyListeners();
   }
 
@@ -37,7 +68,7 @@ class NoteService extends ChangeNotifier {
   List<Note> search(String query) {
     if (query.trim().isEmpty) return notes;
     final q = query.toLowerCase();
-    return _notes
+    return notes
         .where((n) =>
             n.titre.toLowerCase().contains(q) ||
             n.contenu.toLowerCase().contains(q))
