@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
+import '../services/connectivity_service.dart';
 import 'create_page.dart';
 import 'detail_page.dart';
+import 'api_notes_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,7 +16,31 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _query = '';
+  bool _estConnecte = false;
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _verifierConnexion();
+    // Écouter les changements de connexion en temps réel
+    ConnectivityService.onConnectivityChanged.listen((connecte) {
+      if (mounted) {
+        setState(() {
+          _estConnecte = connecte;
+        });
+      }
+    });
+  }
+
+  Future<void> _verifierConnexion() async {
+    final connecte = await ConnectivityService.isConnected();
+    if (mounted) {
+      setState(() {
+        _estConnecte = connecte;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -46,87 +72,47 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Affiche le menu de tri
   void _afficherMenuTri(BuildContext context) {
     final service = context.read<NoteService>();
-
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Trier les notes',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _optionTri(
-                context: context,
-                service: service,
-                tri: TriNotes.dateRecent,
-                label: 'Date — récent d\'abord',
-                icone: Icons.arrow_downward,
-              ),
-              _optionTri(
-                context: context,
-                service: service,
-                tri: TriNotes.dateAncien,
-                label: 'Date — ancien d\'abord',
-                icone: Icons.arrow_upward,
-              ),
-              _optionTri(
-                context: context,
-                service: service,
-                tri: TriNotes.titreAZ,
-                label: 'Titre — A → Z',
-                icone: Icons.sort_by_alpha,
-              ),
-              _optionTri(
-                context: context,
-                service: service,
-                tri: TriNotes.titreZA,
-                label: 'Titre — Z → A',
-                icone: Icons.sort_by_alpha,
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Trier les notes',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _optionTri(context, service, TriNotes.dateRecent,
+                "Date — récent d'abord", Icons.arrow_downward),
+            _optionTri(context, service, TriNotes.dateAncien,
+                "Date — ancien d'abord", Icons.arrow_upward),
+            _optionTri(context, service, TriNotes.titreAZ, "Titre A → Z",
+                Icons.sort_by_alpha),
+            _optionTri(context, service, TriNotes.titreZA, "Titre Z → A",
+                Icons.sort_by_alpha),
+          ],
+        ),
+      ),
     );
   }
 
-  // Une ligne d'option dans le menu de tri
-  Widget _optionTri({
-    required BuildContext context,
-    required NoteService service,
-    required TriNotes tri,
-    required String label,
-    required IconData icone,
-  }) {
+  Widget _optionTri(BuildContext context, NoteService service, TriNotes tri,
+      String label, IconData icone) {
     final estSelectionne = service.triActuel == tri;
-
     return ListTile(
-      leading: Icon(
-        icone,
-        color: estSelectionne ? Colors.amber[700] : Colors.grey,
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontWeight: estSelectionne ? FontWeight.bold : FontWeight.normal,
-          color: estSelectionne ? Colors.amber[700] : Colors.black,
-        ),
-      ),
+      leading:
+          Icon(icone, color: estSelectionne ? Colors.amber[700] : Colors.grey),
+      title: Text(label,
+          style: TextStyle(
+            fontWeight: estSelectionne ? FontWeight.bold : FontWeight.normal,
+            color: estSelectionne ? Colors.amber[700] : Colors.black,
+          )),
       trailing:
           estSelectionne ? Icon(Icons.check, color: Colors.amber[700]) : null,
       onTap: () {
@@ -147,17 +133,16 @@ class _HomePageState extends State<HomePage> {
         '${date.year}';
   }
 
-  // Label affiché selon le tri actuel
   String _labelTri(TriNotes tri) {
     switch (tri) {
       case TriNotes.dateRecent:
-        return 'Récent d\'abord';
+        return "Récent d'abord";
       case TriNotes.dateAncien:
-        return 'Ancien d\'abord';
+        return "Ancien d'abord";
       case TriNotes.titreAZ:
-        return 'Titre A → Z';
+        return "Titre A → Z";
       case TriNotes.titreZA:
-        return 'Titre Z → A';
+        return "Titre Z → A";
     }
   }
 
@@ -173,13 +158,48 @@ class _HomePageState extends State<HomePage> {
         foregroundColor: Colors.white,
         title: const Text('Mes Notes'),
         actions: [
+          // Icône statut connexion
+          Icon(
+            _estConnecte ? Icons.wifi : Icons.wifi_off,
+            color: _estConnecte ? Colors.white : Colors.red[200],
+          ),
+          const SizedBox(width: 4),
+
+          // Bouton vers ApiNotesPage (seulement si connecté)
+          IconButton(
+            // Si connecté -> Nuage plein, sinon -> Nuage barré ou gris
+            icon: Icon(
+              _estConnecte ? Icons.cloud : Icons.cloud_off,
+              color: _estConnecte ? Colors.white : Colors.white54,
+            ),
+            tooltip: 'Notes API',
+            onPressed: () {
+              if (_estConnecte) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ApiNotesPage()),
+                );
+              } else {
+                // Étape 23 : Afficher un message si non connecté
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('Synchronisation API impossible sans connexion ❌'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
+
           // Bouton tri
           IconButton(
             icon: const Icon(Icons.sort),
             tooltip: 'Trier',
             onPressed: () => _afficherMenuTri(context),
           ),
-          // Compteur
+
+          // Compteur notes
           Consumer<NoteService>(
             builder: (context, service, _) => Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -194,9 +214,7 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     '${service.count} note${service.count > 1 ? 's' : ''}',
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                        fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ),
@@ -209,23 +227,17 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _query = value;
-                });
-              },
+              onChanged: (value) => setState(() => _query = value),
               decoration: InputDecoration(
                 hintText: 'Rechercher une note...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _query = '';
-                            _searchController.clear();
-                          });
-                        },
+                        onPressed: () => setState(() {
+                          _query = '';
+                          _searchController.clear();
+                        }),
                       )
                     : null,
                 filled: true,
@@ -242,7 +254,25 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Indicateur du tri actuel
+          // Bandeau hors ligne
+          if (!_estConnecte)
+            Container(
+              width: double.infinity,
+              color: Colors.red[100],
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_off, size: 16, color: Colors.red[700]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mode hors ligne — notes locales uniquement',
+                    style: TextStyle(color: Colors.red[700], fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+
+          // Bandeau tri actuel
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -254,10 +284,9 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   'Tri : ${_labelTri(noteService.triActuel)}',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.amber[800],
-                    fontWeight: FontWeight.w500,
-                  ),
+                      fontSize: 13,
+                      color: Colors.amber[800],
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -321,26 +350,18 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  note.titre,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                                Text(note.titre,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
                                 SizedBox(height: 4),
-                                Text(
-                                  apercu,
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
+                                Text(apercu,
+                                    style:
+                                        const TextStyle(color: Colors.black54)),
                                 SizedBox(height: 8),
-                                Text(
-                                  _formaterDate(note.dateCreation),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
+                                Text(_formaterDate(note.dateCreation),
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey)),
                               ],
                             ),
                           ),

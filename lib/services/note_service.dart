@@ -1,16 +1,25 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
 
-enum TriNotes {
-  dateRecent,
-  dateAncien,
-  titreAZ,
-  titreZA,
-}
+enum TriNotes { dateRecent, dateAncien, titreAZ, titreZA }
 
 class NoteService extends ChangeNotifier {
   final List<Note> _notes = [];
+  final SharedPreferences _prefs;
+  static const String _cle = 'notes_sauvegardees';
   TriNotes _triActuel = TriNotes.dateRecent;
+
+  // Constructeur reçoit l'instance SharedPreferences
+  NoteService({required SharedPreferences prefs}) : _prefs = prefs {
+    _loadNotes(); // charger les notes au démarrage
+  }
+
+  // ─── GETTERS ───────────────────────────────────────────────
+
+  TriNotes get triActuel => _triActuel;
+  int get count => _notes.length;
 
   List<Note> get notes {
     final liste = List<Note>.from(_notes);
@@ -31,17 +40,31 @@ class NoteService extends ChangeNotifier {
     return List.unmodifiable(liste);
   }
 
-  TriNotes get triActuel => _triActuel;
-  int get count => _notes.length;
+  // ─── CHARGEMENT ────────────────────────────────────────────
 
-  void changerTri(TriNotes tri) {
-    _triActuel = tri;
-    notifyListeners();
+  void _loadNotes() {
+    final String? donnees = _prefs.getString(_cle);
+    if (donnees != null) {
+      final List<dynamic> listeJson = jsonDecode(donnees);
+      _notes.clear();
+      _notes.addAll(listeJson.map((j) => Note.fromJson(j)).toList());
+      notifyListeners();
+    }
   }
+
+  // ─── SAUVEGARDE ────────────────────────────────────────────
+
+  Future<void> _saveNotes() async {
+    final String donnees = jsonEncode(_notes.map((n) => n.toJson()).toList());
+    await _prefs.setString(_cle, donnees);
+  }
+
+  // ─── CRUD ──────────────────────────────────────────────────
 
   void addNote(Note note) {
     _notes.add(note);
     notifyListeners();
+    _saveNotes();
   }
 
   void updateNote(Note note) {
@@ -49,12 +72,14 @@ class NoteService extends ChangeNotifier {
     if (index != -1) {
       _notes[index] = note;
       notifyListeners();
+      _saveNotes();
     }
   }
 
   void deleteNote(String id) {
     _notes.removeWhere((n) => n.id == id);
     notifyListeners();
+    _saveNotes();
   }
 
   Note? getNoteById(String id) {
@@ -73,5 +98,10 @@ class NoteService extends ChangeNotifier {
             n.titre.toLowerCase().contains(q) ||
             n.contenu.toLowerCase().contains(q))
         .toList();
+  }
+
+  void changerTri(TriNotes tri) {
+    _triActuel = tri;
+    notifyListeners();
   }
 }

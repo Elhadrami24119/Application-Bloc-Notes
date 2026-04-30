@@ -1,15 +1,22 @@
 name: bloc_notes
 description: "Application Bloc-Notes Flutter"
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  # State Management
   provider: ^6.1.2
+  # Local Storage
+  shared_preferences: ^2.3.2
+  # Networking & Connectivity
+  http: ^1.2.1
+  connectivity_plus: ^6.0.3
+  # UI Icons
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
